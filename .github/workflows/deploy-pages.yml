@@ -18,9 +18,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Bundle MediaPipe and model locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site/vendor
+          cp index.html camera-test.html _site/
+          npm install --prefix /tmp/finger-assets --no-save --no-audit --no-fund @mediapipe/tasks-vision@0.10.14
+          cp /tmp/finger-assets/node_modules/@mediapipe/tasks-vision/vision_bundle.js _site/vendor/
+          cp -r /tmp/finger-assets/node_modules/@mediapipe/tasks-vision/wasm _site/vendor/
+          curl --fail --location --retry 3 --output _site/vendor/hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+          test -s _site/vendor/vision_bundle.js
+          test -s _site/vendor/hand_landmarker.task
+          touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
