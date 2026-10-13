@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.8</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.9</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}body{background:#0d1424;color:#fff;margin:0;padding:18px;max-width:900px;margin-inline:auto}h1{font-size:1.6rem}p{color:#b7c6d9}.stage{position:relative;overflow:hidden;border-radius:16px;background:#18243a;aspect-ratio:4/3}video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)}.controls{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}button{background:#36d8a4;color:#071820;border:0;border-radius:12px;padding:13px 20px;font-weight:700;font-size:1rem}button:disabled{opacity:.5}.count{font-size:3rem;font-weight:800}#status{min-height:2em}small{color:#b7c6d9}
 </style></head><body>
@@ -63,18 +63,10 @@ start.onclick=async()=>{
  }catch(e){status.textContent="Camera error: "+e.name+": "+e.message;start.disabled=false}
 };
 async function loadVision(){
- if(window.vision?.HandLandmarker)return window.vision;
  status.textContent="Loading AI library from this website…";
- await loadScript("./vendor/vision_bundle.js");
- if(!window.vision?.HandLandmarker)throw Error("Local MediaPipe library loaded without HandLandmarker.");
- return window.vision;
-}
-function loadScript(url){
- return new Promise((resolve,reject)=>{
-  const s=document.createElement("script");s.src=url;s.async=true;
-  s.onload=resolve;s.onerror=()=>reject(Error("Could not load local AI library: "+url));
-  document.head.appendChild(s);
- });
+ const m=await import("./vendor/vision_bundle.mjs");
+ if(!m?.HandLandmarker || !m?.FilesetResolver)throw Error("Local MediaPipe module exports are missing.");
+ return m;
 }
 ai.onclick=async()=>{
  ai.disabled=true;const mine=session;status.textContent="Camera running. Downloading AI model…";details.textContent="Loading MediaPipe model (first launch can take a moment)";
