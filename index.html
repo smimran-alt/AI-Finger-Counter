@@ -1,18 +1,18 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.4</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.5</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}body{background:#0d1424;color:#fff;margin:0;padding:18px;max-width:900px;margin-inline:auto}h1{font-size:1.6rem}p{color:#b7c6d9}.stage{position:relative;overflow:hidden;border-radius:16px;background:#18243a;aspect-ratio:4/3}video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)}.controls{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}button{background:#36d8a4;color:#071820;border:0;border-radius:12px;padding:13px 20px;font-weight:700;font-size:1rem}button:disabled{opacity:.5}.count{font-size:3rem;font-weight:800}#status{min-height:2em}small{color:#b7c6d9}
 </style></head><body>
 <h1>✋ AI Finger Counter</h1><p>Count raised fingers with your camera — up to two hands.</p>
 <div class="stage"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
 <div class="controls"><button id="start">Start Camera</button><button id="ai" disabled>Start AI Tracking</button><button id="stop" disabled>Stop Camera</button></div>
-<div class="count"><span id="count">—</span> <small>fingers</small></div><p id="details">AI tracking not started</p><p id="status" role="status">Ready. Tap Start Camera.</p><small>Camera video stays on your device. Requires HTTPS and camera permission. Counting is approximate and works best with a front-facing palm and good lighting.</small>
+<div class="count"><span id="count">—</span> <small>fingers</small></div><p id="details">AI tracking not started</p><p id="diagnostic" style="font-size:.85rem;color:#c4d6ed">Frames processed: 0</p><p id="status" role="status">Ready. Tap Start Camera.</p><small>Camera video stays on your device. Requires HTTPS and camera permission. Counting is approximate and works best with a front-facing palm and good lighting.</small>
 <script>
 
 const video=document.getElementById("video"),canvas=document.getElementById("overlay"),ctx=canvas.getContext("2d");
 const status=document.getElementById("status"),count=document.getElementById("count"),start=document.getElementById("start"),stop=document.getElementById("stop"),ai=document.getElementById("ai");
-let tracker,stream,active=false,frameId=0,lastTime=-1,session=0;
-const details=document.getElementById("details");let lastDetection=0;const edges=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+let tracker,stream,active=false,frameId=0,lastTime=-1,session=0,processed=0,detected=0;
+const details=document.getElementById("details"),diagnostic=document.getElementById("diagnostic");let lastDetection=0;const edges=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 function angle(a,b,c){const u=[a.x-b.x,a.y-b.y],v=[c.x-b.x,c.y-b.y];const dot=u[0]*v[0]+u[1]*v[1],n=Math.hypot(...u)*Math.hypot(...v);return n?Math.acos(Math.max(-1,Math.min(1,dot/n)))*180/Math.PI:0}
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function fingers(p){
@@ -31,11 +31,12 @@ function loop(){
     if(video.readyState>=2 && video.videoWidth && video.currentTime!==lastTime){
       lastTime=video.currentTime;
       canvas.width=video.videoWidth;canvas.height=video.videoHeight;
-      const r=tracker.detectForVideo(video,performance.now());
+      const r=tracker.detectForVideo(video,performance.now());processed++;if(r.landmarks.length)detected++;
       ctx.clearRect(0,0,canvas.width,canvas.height);
       let total=0;
       for(const hand of r.landmarks){draw(hand);total+=fingers(hand)}
-      count.textContent=total;
+      count.textContent=r.landmarks.length?total:"—";
+      if(processed%15===0)diagnostic.textContent="AI frames processed: "+processed+" | frames with hands: "+detected+" | camera: "+video.videoWidth+"×"+video.videoHeight+" | video ready: "+video.readyState;
       status.textContent=r.landmarks.length+" hand(s) detected — AI running";details.textContent=r.landmarks.length ? "Detected fingers: "+total+" (show palm clearly to camera)" : "No hand found. Move your hand into the frame with good lighting.";
     }
   }catch(e){status.textContent="Tracking error: "+e.message;details.textContent="AI inference stopped. Refresh and try again.";active=false;ai.disabled=false;return}
@@ -45,7 +46,7 @@ function cleanup(){
  active=false;cancelAnimationFrame(frameId);session++;
  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
  video.pause();video.srcObject=null;
- ctx.clearRect(0,0,canvas.width,canvas.height);count.textContent="—";details.textContent="AI tracking not started";
+ ctx.clearRect(0,0,canvas.width,canvas.height);count.textContent="—";details.textContent="AI tracking not started";diagnostic.textContent="Frames processed: 0";
  start.disabled=false;ai.disabled=true;stop.disabled=true;
 }
 start.onclick=async()=>{
@@ -66,10 +67,10 @@ ai.onclick=async()=>{
   if(!tracker){
    const m=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm");
    const vision=await m.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm");
-   tracker=await m.HandLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:"CPU"},runningMode:"VIDEO",numHands:2});
+   tracker=await m.HandLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:"CPU"},runningMode:"VIDEO",numHands:2,minHandDetectionConfidence:0.3,minHandPresenceConfidence:0.3,minTrackingConfidence:0.3});
   }
   if(mine!==session)return;
-  active=true;lastTime=-1;details.textContent="AI ready. Hold one hand up with your palm facing the camera.";loop();
+  active=true;lastTime=-1;processed=0;detected=0;details.textContent="AI ready. Hold one hand up with your palm facing the camera.";loop();
  }catch(e){if(mine!==session)return;status.textContent="Camera works; AI loading failed: "+(e?.message||String(e));details.textContent="Try reloading with a stable internet connection.";ai.disabled=false}
 };
 stop.onclick=()=>{cleanup();status.textContent="Camera stopped"};
