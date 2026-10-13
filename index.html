@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.7</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.8</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}body{background:#0d1424;color:#fff;margin:0;padding:18px;max-width:900px;margin-inline:auto}h1{font-size:1.6rem}p{color:#b7c6d9}.stage{position:relative;overflow:hidden;border-radius:16px;background:#18243a;aspect-ratio:4/3}video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)}.controls{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}button{background:#36d8a4;color:#071820;border:0;border-radius:12px;padding:13px 20px;font-weight:700;font-size:1rem}button:disabled{opacity:.5}.count{font-size:3rem;font-weight:800}#status{min-height:2em}small{color:#b7c6d9}
 </style></head><body>
@@ -62,42 +62,27 @@ start.onclick=async()=>{
   ai.disabled=false;stop.disabled=false;
  }catch(e){status.textContent="Camera error: "+e.name+": "+e.message;start.disabled=false}
 };
-function loadScript(url){
- return new Promise((resolve,reject)=>{
-  const script=document.createElement("script");script.src=url;script.async=true;
-  const timeout=setTimeout(()=>{script.remove();reject(Error("Timed out: "+url))},12000);
-  script.onload=()=>{clearTimeout(timeout);resolve()};
-  script.onerror=()=>{clearTimeout(timeout);script.remove();reject(Error("Unavailable: "+url))};
-  document.head.appendChild(script);
- });
-}
 async function loadVision(){
  if(window.vision?.HandLandmarker)return window.vision;
- const sources=[
-  "https://unpkg.com/@mediapipe/tasks-vision@0.10.14",
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14"
- ];
- const errors=[];
- for(const base of sources){
-  try{
-   status.textContent="Loading AI library from "+new URL(base).hostname+"…";
-   await loadScript(base+"/vision_bundle.js");
-   if(window.vision?.HandLandmarker){
-    visionBase=base;
-    return window.vision;
-   }
-   errors.push(new URL(base).hostname+": loaded but vision global missing");
-  }catch(e){errors.push(e.message)}
- }
- throw Error("Both AI library providers failed: "+errors.join(" | "));
+ status.textContent="Loading AI library from this website…";
+ await loadScript("./vendor/vision_bundle.js");
+ if(!window.vision?.HandLandmarker)throw Error("Local MediaPipe library loaded without HandLandmarker.");
+ return window.vision;
+}
+function loadScript(url){
+ return new Promise((resolve,reject)=>{
+  const s=document.createElement("script");s.src=url;s.async=true;
+  s.onload=resolve;s.onerror=()=>reject(Error("Could not load local AI library: "+url));
+  document.head.appendChild(s);
+ });
 }
 ai.onclick=async()=>{
  ai.disabled=true;const mine=session;status.textContent="Camera running. Downloading AI model…";details.textContent="Loading MediaPipe model (first launch can take a moment)";
  try{
   if(!tracker){
    const m=await loadVision();
-   const vision=await m.FilesetResolver.forVisionTasks(visionBase+"/wasm");
-   tracker=await m.HandLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:"CPU"},runningMode:"VIDEO",numHands:2,minHandDetectionConfidence:0.3,minHandPresenceConfidence:0.3,minTrackingConfidence:0.3});
+   const vision=await m.FilesetResolver.forVisionTasks("./vendor/wasm");
+   tracker=await m.HandLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:"./vendor/hand_landmarker.task",delegate:"CPU"},runningMode:"VIDEO",numHands:2,minHandDetectionConfidence:0.3,minHandPresenceConfidence:0.3,minTrackingConfidence:0.3});
   }
   if(mine!==session)return;
   active=true;lastTime=-1;processed=0;detected=0;details.textContent="AI ready. Hold one hand up with your palm facing the camera.";loop();
