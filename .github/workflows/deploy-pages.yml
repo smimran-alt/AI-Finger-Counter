@@ -28,10 +28,21 @@ jobs:
           mkdir -p _site/vendor
           cp index.html camera-test.html _site/
           npm install --prefix /tmp/finger-assets --no-save --no-audit --no-fund @mediapipe/tasks-vision@0.10.14
-          cp /tmp/finger-assets/node_modules/@mediapipe/tasks-vision/vision_bundle.js _site/vendor/
+          PACKAGE=/tmp/finger-assets/node_modules/@mediapipe/tasks-vision
+          echo "MediaPipe package files:"
+          ls -la "$PACKAGE"
+          if [ -f "$PACKAGE/vision_bundle.mjs" ]; then
+            cp "$PACKAGE/vision_bundle.mjs" _site/vendor/vision_bundle.mjs
+          elif [ -f "$PACKAGE/vision_bundle.js" ]; then
+            cp "$PACKAGE/vision_bundle.js" _site/vendor/vision_bundle.mjs
+          else
+            echo "::error::Missing MediaPipe ES module bundle; available files:"
+            find "$PACKAGE" -maxdepth 2 -type f | head -60
+            exit 1
+          fi
           cp -r /tmp/finger-assets/node_modules/@mediapipe/tasks-vision/wasm _site/vendor/
           curl --fail --location --retry 3 --output _site/vendor/hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
-          test -s _site/vendor/vision_bundle.js
+          test -s _site/vendor/vision_bundle.mjs
           test -s _site/vendor/hand_landmarker.task
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
