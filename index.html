@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.5</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Finger Counter v1.6</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}body{background:#0d1424;color:#fff;margin:0;padding:18px;max-width:900px;margin-inline:auto}h1{font-size:1.6rem}p{color:#b7c6d9}.stage{position:relative;overflow:hidden;border-radius:16px;background:#18243a;aspect-ratio:4/3}video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)}.controls{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}button{background:#36d8a4;color:#071820;border:0;border-radius:12px;padding:13px 20px;font-weight:700;font-size:1rem}button:disabled{opacity:.5}.count{font-size:3rem;font-weight:800}#status{min-height:2em}small{color:#b7c6d9}
 </style></head><body>
@@ -7,6 +7,7 @@
 <div class="stage"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
 <div class="controls"><button id="start">Start Camera</button><button id="ai" disabled>Start AI Tracking</button><button id="stop" disabled>Stop Camera</button></div>
 <div class="count"><span id="count">—</span> <small>fingers</small></div><p id="details">AI tracking not started</p><p id="diagnostic" style="font-size:.85rem;color:#c4d6ed">Frames processed: 0</p><p id="status" role="status">Ready. Tap Start Camera.</p><small>Camera video stays on your device. Requires HTTPS and camera permission. Counting is approximate and works best with a front-facing palm and good lighting.</small>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js"></script>
 <script>
 
 const video=document.getElementById("video"),canvas=document.getElementById("overlay"),ctx=canvas.getContext("2d");
@@ -65,8 +66,9 @@ ai.onclick=async()=>{
  ai.disabled=true;const mine=session;status.textContent="Camera running. Downloading AI model…";details.textContent="Loading MediaPipe model (first launch can take a moment)";
  try{
   if(!tracker){
-   const m=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm");
-   const vision=await m.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm");
+   const m=window.vision;
+   if(!m?.FilesetResolver || !m?.HandLandmarker) throw Error("MediaPipe library could not load. Check browser network access to cdn.jsdelivr.net.");
+   const vision=await m.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
    tracker=await m.HandLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:"CPU"},runningMode:"VIDEO",numHands:2,minHandDetectionConfidence:0.3,minHandPresenceConfidence:0.3,minTrackingConfidence:0.3});
   }
   if(mine!==session)return;
